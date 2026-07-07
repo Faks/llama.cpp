@@ -1,0 +1,28 @@
+networks:
+    dokploy-network:
+        external: true
+
+services:
+    server-rocm:
+        build:
+            context: .
+            dockerfile: .devops/rocm.Dockerfile
+            target: server
+            args:
+                UBUNTU_VERSION: ${UBUNTU_VERSION:-24.04}
+                ROCM_VERSION: ${ROCM_VERSION:-7.2.1}
+                AMDGPU_VERSION: ${AMDGPU_VERSION:-7.2.1}
+                NODE_VERSION: ${NODE_VERSION:-24}
+                BUILD_DATE: ${BUILD_DATE:-N/A}
+                APP_VERSION: ${APP_VERSION:-N/A}
+                APP_REVISION: ${APP_REVISION:-N/A}
+                IMAGE_URL: ${IMAGE_URL:-https://github.com/ggml-org/llama.cpp}
+                IMAGE_SOURCE: ${IMAGE_SOURCE:-https://github.com/ggml-org/llama.cpp}
+                ROCM_DOCKER_ARCH: ${ROCM_DOCKER_ARCH:-gfx908;gfx90a;gfx942;gfx1030;gfx1100;gfx1101;gfx1102;gfx1151;gfx1150;gfx1200;gfx1201}
+        volumes:
+            - "${HOST_DATA_DIR:-/home/faks}:/home/faks"
+        networks:
+            - dokploy-network
+        devices:
+            - /dev/kfd:/dev/kfd
+            - /dev/dri:/dev/dri

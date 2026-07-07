@@ -1,0 +1,24 @@
+networks:
+    dokploy-network:
+        external: true
+
+services:
+    server-vulkan:
+        build:
+            context: .
+            dockerfile: .devops/vulkan.Dockerfile
+            target: server
+            args:
+                UBUNTU_VERSION: ${UBUNTU_VERSION:-26.04}
+                NODE_VERSION: ${NODE_VERSION:-24}
+                BUILD_DATE: ${BUILD_DATE:-N/A}
+                APP_VERSION: ${APP_VERSION:-N/A}
+                APP_REVISION: ${APP_REVISION:-N/A}
+                IMAGE_URL: ${IMAGE_URL:-https://github.com/ggml-org/llama.cpp}
+                IMAGE_SOURCE: ${IMAGE_SOURCE:-https://github.com/ggml-org/llama.cpp}
+        volumes:
+            - "${HOST_DATA_DIR:-/home/faks}:/home/faks"
+        networks:
+            - dokploy-network
+        devices:
+            - /dev/dri:/dev/dri

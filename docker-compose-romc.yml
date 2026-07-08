@@ -4,6 +4,7 @@ networks:
 
 services:
     server-rocm:
+        container_name: llama-cpp-romc-server
         build:
             context: .
             dockerfile: .devops/rocm.Dockerfile

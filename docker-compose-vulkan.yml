@@ -4,6 +4,7 @@ networks:
 
 services:
     server-vulkan:
+        container_name: llama-cpp-vulkan-server
         build:
             context: .
             dockerfile: .devops/vulkan.Dockerfile

@@ -12,6 +12,34 @@
 
 LLM inference in C/C++
 
+## ⚡ This fork — Fable's MoE-offload prefill optimizations
+
+Two **opt-in** optimizations for large MoE models whose experts are offloaded to system RAM
+(`--n-cpu-moe`), found and implemented by Fable. Both are **off by default**, toggled via
+environment variables, and produce **token-identical** output to mainline.
+
+| Env var | What it does |
+| --- | --- |
+| `GGML_CUDA_REGISTER_HOST=1` | Page-locks (pins) the mmap'd CPU expert weights so host→device copies go straight over DMA instead of through the driver's hidden bounce buffer (~6–7 → ~20 GB/s). |
+| `GGML_SCHED_PREFETCH_EXPERTS=1` | Prefetches each layer's experts on a second CUDA stream, so the weight uploads overlap compute instead of stalling the GPU. |
+
+### Benchmark
+
+Measured on an **RTX 3060 12GB** with **Qwen3.6-35B-A3B** (`--n-cpu-moe 26`), prompt-processing at 2048 (`MODEL` = path to your `.gguf`):
+
+```bash
+# baseline (patches off):
+./build/bin/llama-bench -m MODEL -ngl 99 -ncmoe 26 -p 2048 -n 0 -r 5 -b 2048 -ub 2048
+
+# patched (both optimizations on):
+GGML_CUDA_REGISTER_HOST=1 GGML_SCHED_PREFETCH_EXPERTS=1 \
+./build/bin/llama-bench -m MODEL -ngl 99 -ncmoe 26 -p 2048 -n 0 -r 5 -b 2048 -ub 2048
+```
+
+Result: **~1143 → ~1880 t/s** prefill (**+64%**) — same GPU, same settings, token-identical.
+
+Branches: [`fable5/host-register`](https://github.com/thecodacus/llama.cpp/tree/fable5/host-register) (pinning only) · [`fable5/prefetch-experts`](https://github.com/thecodacus/llama.cpp/tree/fable5/prefetch-experts) (both — this branch).
+
 ## Recent API changes
 
 - [Changelog for `libllama` API](https://github.com/ggml-org/llama.cpp/issues/9289)

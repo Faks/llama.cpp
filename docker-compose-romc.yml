@@ -19,7 +19,12 @@ services:
                 APP_REVISION: ${APP_REVISION:-N/A}
                 IMAGE_URL: ${IMAGE_URL:-https://github.com/ggml-org/llama.cpp}
                 IMAGE_SOURCE: ${IMAGE_SOURCE:-https://github.com/ggml-org/llama.cpp}
-                ROCM_DOCKER_ARCH: ${ROCM_DOCKER_ARCH:-gfx908;gfx90a;gfx942;gfx1030;gfx1100;gfx1101;gfx1102;gfx1151;gfx1150;gfx1200;gfx1201}
+                ROCM_DOCKER_ARCH: ${ROCM_DOCKER_ARCH:-gfx1201}
+        command: >
+            --models-preset /home/faks/Projects/Other/Ilfa/vendor/solumdesignum/handler/models.ini
+            --host 0.0.0.0
+            --port 8080
+            --models-max 1
         volumes:
             - "${HOST_DATA_DIR:-/home/faks}:/home/faks"
         networks:

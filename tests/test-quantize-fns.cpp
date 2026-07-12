@@ -18,6 +18,9 @@ constexpr float MAX_QUANTIZATION_REFERENCE_ERROR = 0.0001f;
 constexpr float MAX_QUANTIZATION_TOTAL_ERROR = 0.002f;
 constexpr float MAX_QUANTIZATION_TOTAL_ERROR_BINARY = 0.025f;
 constexpr float MAX_QUANTIZATION_TOTAL_ERROR_TERNARY = 0.01f;
+// Q2_0 is a 2-bit block-scaled format (one fp16 scale per 128-element block, no zero-point), so its
+// error sits in the same band as the ternary formats rather than the k-quant 2-bit types below.
+constexpr float MAX_QUANTIZATION_TOTAL_ERROR_Q2_0 = 0.01f;
 constexpr float MAX_QUANTIZATION_TOTAL_ERROR_2BITS = 0.0075f;
 constexpr float MAX_QUANTIZATION_TOTAL_ERROR_3BITS = 0.0040f;
 constexpr float MAX_QUANTIZATION_TOTAL_ERROR_3BITS_XXS = 0.0050f;
@@ -27,6 +30,7 @@ constexpr float MAX_DOT_PRODUCT_ERROR_LOWBIT = 0.04f;
 constexpr float MAX_DOT_PRODUCT_ERROR_FP4 = 0.03f;
 constexpr float MAX_DOT_PRODUCT_ERROR_BINARY = 0.40f;
 constexpr float MAX_DOT_PRODUCT_ERROR_TERNARY = 0.15f;
+constexpr float MAX_DOT_PRODUCT_ERROR_Q2_0 = 0.15f;
 
 static const char* RESULT_STR[] = {"ok", "FAILED"};
 
@@ -148,6 +152,7 @@ int main(int argc, char * argv[]) {
             const float total_error = total_quantization_error(qfns, qfns_cpu, test_size, test_data.data());
             const float max_quantization_error =
                 type == GGML_TYPE_Q1_0    ? MAX_QUANTIZATION_TOTAL_ERROR_BINARY :
+                type == GGML_TYPE_Q2_0    ? MAX_QUANTIZATION_TOTAL_ERROR_Q2_0 :
                 type == GGML_TYPE_TQ1_0   ? MAX_QUANTIZATION_TOTAL_ERROR_TERNARY :
                 type == GGML_TYPE_TQ2_0   ? MAX_QUANTIZATION_TOTAL_ERROR_TERNARY :
                 type == GGML_TYPE_Q2_K    ? MAX_QUANTIZATION_TOTAL_ERROR_2BITS :
@@ -175,6 +180,8 @@ int main(int argc, char * argv[]) {
                                           ? MAX_DOT_PRODUCT_ERROR_LOWBIT
                                           : type == GGML_TYPE_Q1_0
                                           ? MAX_DOT_PRODUCT_ERROR_BINARY
+                                          : type == GGML_TYPE_Q2_0
+                                          ? MAX_DOT_PRODUCT_ERROR_Q2_0
                                           : type == GGML_TYPE_TQ1_0 || type == GGML_TYPE_TQ2_0
                                           ? MAX_DOT_PRODUCT_ERROR_TERNARY
                                           : type == GGML_TYPE_NVFP4

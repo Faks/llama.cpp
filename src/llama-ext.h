@@ -125,7 +125,7 @@ LLAMA_API llama_context * llama_get_ctx_other(struct llama_context * ctx);
 LLAMA_API void            llama_set_capture_layers(struct llama_context * ctx,
                                                    const int32_t *        layer_ids,
                                                    size_t                 n_layers,
-                                                   bool                   masked);
+                                                   bool                   masked = true);
 LLAMA_API uint32_t llama_get_n_capture(struct llama_context * ctx);
 // mirrors llama_get_embeddings_nextn / _ith
 LLAMA_API float *  llama_get_embeddings_capture    (struct llama_context * ctx);

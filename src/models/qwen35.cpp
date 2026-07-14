@@ -162,13 +162,24 @@ llama_model_qwen35::graph::graph(const llama_model & model, const llm_graph_para
     // narrowed to output rows (inp_out_ids) *before* the last layer runs if every
     // active consumer of the un-narrowed rows agrees to that -- i.e. embeddings_nextn
     // wants the masked (narrow-early) layout, AND capture is either inactive or
-    // also wants it narrowed at the tap point. If capture wants a dense per-position
-    // tap (embeddings_capture_masked == false) while embeddings_nextn_masked is on,
-    // narrowing early would clip capture's own dense rows too (they share inp_out_ids
-    // at the same point), so defer to the post-loop narrowing instead -- capture
-    // then sees the full, unnarrowed layer stream and only the final projection
-    // (result_norm + lm_head) is limited to inp_out_ids.
-    const bool capture_wants_dense = cparams.n_capture_layers > 0 && !cparams.embeddings_capture_masked;
+    // also wants it narrowed at the tap point. Capture only cares about this at all
+    // if the LAST layer itself is one of the requested capture layers -- taps at any
+    // earlier layer have already branched off `cur` before this point in the loop
+    // (see the per-layer tap below), so narrowing the last layer's own compute doesn't
+    // touch them. If a dense (embeddings_capture_masked == false) tap of the last
+    // layer specifically is requested while embeddings_nextn_masked is on, narrowing
+    // early would clip that dense row too (they share inp_out_ids at the same point),
+    // so defer to the post-loop narrowing instead -- capture then sees the full,
+    // unnarrowed last-layer output and only the final projection (result_norm +
+    // lm_head) is limited to inp_out_ids.
+    bool capture_taps_last_layer = false;
+    for (uint32_t c = 0; c < cparams.n_capture_layers; ++c) {
+        if (cparams.capture_layer_idx[c] == n_layer - 1) {
+            capture_taps_last_layer = true;
+            break;
+        }
+    }
+    const bool capture_wants_dense = capture_taps_last_layer && !cparams.embeddings_capture_masked;
 
     // t_h_nextn's readback (llama-context.cpp) trusts embeddings_nextn_masked to know
     // whether t_h_nextn is narrow (n_outputs rows) or full-width (ubatch.n_tokens rows);

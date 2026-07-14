@@ -1245,8 +1245,6 @@ void llama_context::set_capture_layers(const std::vector<int32_t> & layer_ids, b
 
     cparams.n_capture_layers   = n;
     cparams.embeddings_capture = n > 0;
-    // capture rows reuse the masked output-row layout; force masked extraction on.
-    cparams.embeddings_nextn_masked = true;
 }
 
 void llama_context::set_dspark_ctx(
@@ -2121,6 +2119,19 @@ int llama_context::decode(const llama_batch & batch_inp) {
             const bool    cap_masked = cparams.embeddings_capture_masked;
             const int64_t n_rows_cap = cap_masked ? n_outputs : (int64_t) ubatch.n_tokens;
             const int64_t offset_cap = cap_masked ? n_outputs_prev : n_tokens_prev;
+
+            // Dense (unmasked) rows are stored and later indexed in raw ubatch-token
+            // order (get_embeddings_capture_ith(i) reads row i directly), and
+            // output_reorder()'s swap list is built to fix up *output-row* order --
+            // neither accounts for split_equal()'s per-sequence interleaving of a
+            // multi-sequence ubatch (llama-batch.cpp), so a dense capture row for
+            // token i could come from the wrong sequence, or get scrambled by an
+            // output-row swap meant for a different token. Every current dense
+            // capture consumer (dspark) is single-sequence; fail loudly rather than
+            // silently return another sequence's capture if that ever changes.
+            GGML_ASSERT((cap_masked || ubatch.n_seqs_unq <= 1) &&
+                        "dense (unmasked) capture is only validated for single-sequence ubatches; "
+                        "multi-sequence interleaving is not accounted for in its row ordering");
 
             if (embd_capture.data && cparams.n_capture_layers > 0 && n_rows_cap > 0 &&
                 cparams.pooling_type == LLAMA_POOLING_TYPE_NONE) {

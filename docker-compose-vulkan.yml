@@ -5,12 +5,18 @@ networks:
 services:
     server-vulkan:
         container_name: llama-cpp-vulkan-server
+        ipc: host
+        security_opt:
+            - seccomp:unconfined
+        group_add:
+            - video
+            - render
         build:
             context: .
             dockerfile: .devops/vulkan.Dockerfile
             target: server
             args:
-                UBUNTU_VERSION: ${UBUNTU_VERSION:-26.04}
+                UBUNTU_VERSION: ${UBUNTU_VERSION:-24.04}
                 NODE_VERSION: ${NODE_VERSION:-24}
                 BUILD_DATE: ${BUILD_DATE:-N/A}
                 APP_VERSION: ${APP_VERSION:-N/A}
@@ -24,6 +30,7 @@ services:
             --models-max 1
         volumes:
             - "${HOST_DATA_DIR:-/home/faks}:/home/faks"
+            - ~/.cache:/root/.cache
         networks:
             - dokploy-network
         devices:

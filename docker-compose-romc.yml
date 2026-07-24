@@ -1,10 +1,12 @@
-networks:
-    dokploy-network:
-        external: true
-
 services:
     server-rocm:
         container_name: llama-cpp-romc-server
+        ipc: host
+        security_opt:
+            - seccomp:unconfined
+        group_add:
+            - video
+            - render
         build:
             context: .
             dockerfile: .devops/rocm.Dockerfile
@@ -25,9 +27,10 @@ services:
             --host 0.0.0.0
             --port 8080
             --models-max 1
-            --sampling-seq edsypmxt
+        user: "1000:1000"
         volumes:
             - "${HOST_DATA_DIR:-/home/faks}:/home/faks"
+            - ~/.cache:/root/.cache
         networks:
             - dokploy-network
         devices:

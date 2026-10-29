@@ -4023,6 +4023,12 @@ ggml_tensor * llm_graph_context::build_rs(
 
     ggml_tensor * states_all = ggml_get_rows(ctx0, states, state_copy);
 
+    // With one state there is no relocation tail. Keep the direct gather for backend fusions.
+    if (n_rs == 1 && n_seqs == 1 && !get_state_rows) {
+        ggml_build_forward_expand(gf, states_all);
+        return states_all;
+    }
+
     ggml_tensor * output_states = get_state_rows ?
         get_state_rows(ctx0, states, state_copy_main) :
         ggml_view_2d(ctx0, states_all, state_size, n_seqs, states_all->nb[1], 0);

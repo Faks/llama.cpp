@@ -1241,7 +1241,7 @@ static void test_all(const std::string & title, std::function<void(const TestCas
             null ::= "null"
             number ::= ("-"? integral-part) ("." decimal-part)? ([eE] [-+]? integral-part)?
             object ::= "{" space ( string ":" space value ("," space string ":" space value)* )? space "}"
-            root ::= object
+            root ::= value
             space ::= | " " | "\n"{1,2} [ \t]{0,20}
             string ::= "\"" char* "\""
             value ::= object | array | string | number | boolean | null
@@ -1263,7 +1263,7 @@ static void test_all(const std::string & title, std::function<void(const TestCas
             null ::= "null"
             number ::= ("-"? integral-part) ("." decimal-part)? ([eE] [-+]? integral-part)?
             object ::= "{" space ( string ":" space value ("," space string ":" space value)* )? space "}"
-            root ::= object
+            root ::= value
             space ::= | " " | "\n"{1,2} [ \t]{0,20}
             string ::= "\"" char* "\""
             value ::= object | array | string | number | boolean | null
@@ -1321,7 +1321,7 @@ static void test_all(const std::string & title, std::function<void(const TestCas
             space ::= | " " | "\n"{1,2} [ \t]{0,20}
             string ::= "\"" char* "\""
             value ::= object | array | string | number | boolean | null
-            x ::= object
+            x ::= value
             x-kv ::= "\"x\"" space ":" space x
             x-rest ::= ( "," space y-kv )?
             y ::= ("\"a\"" | "\"b\"")
@@ -1641,6 +1641,23 @@ static void test_all(const std::string & title, std::function<void(const TestCas
             "type": "string",
             "pattern": "^(a$"
         })""",
+        ""
+    });
+
+    test({
+        FAILURE,
+        "allOf with a $ref cycle",
+        R"""({
+            "allOf": [{"$ref": "#/$defs/a"}],
+            "$defs": {"a": {"$ref": "#/$defs/a"}}
+        })""",
+        ""
+    });
+
+    test({
+        FAILURE,
+        "long property name with additionalProperties",
+        R"""({"type": "object", "properties": {")""" + std::string(1000, 'a') + R"""(": {"type": "string"}}, "additionalProperties": true})""",
         ""
     });
 

@@ -195,8 +195,7 @@ struct common_sampler {
 
     // > 0: the chain starts with top-k (all earlier samplers are no-ops), so cur_p can be built from the top k logits only
     int32_t fast_topk = 0;
-    // for rejection sampling; independent of the draft, or the target distribution is not preserved
-    std::mt19937 rng;
+
 
     // with fast_topk: tokens that the logit-bias sampler at the start of the chain sets to -INFINITY (all of its
     // biases are -INFINITY, e.g. ignore_eos or model suppress tokens); the top k is taken with these masked
@@ -204,6 +203,8 @@ struct common_sampler {
 
     // scratch: the logits with fast_topk_mask applied
     std::vector<float> logits_masked;
+    // for rejection sampling; independent of the draft, or the target distribution is not preserved
+    std::mt19937 rng;
 
     void reset() {
         prev.clear();
@@ -766,6 +767,7 @@ void common_perf_print(const struct llama_context * ctx, const struct common_sam
         LOG_INF("%s:       total time = %10.2f ms / %5d tokens\n", __func__, (t_end_ms - data.t_start_ms), (data.n_p_eval + data.n_eval));
         LOG_INF("%s: unaccounted time = %10.2f ms / %5.1f %%      (total - sampling - prompt eval - eval) / (total)\n", __func__, t_unacc_ms, t_unacc_pc);
         LOG_INF("%s:    graphs reused = %10d\n", __func__, data.n_reused);
+        LOG_INF("%s:   graph reallocs = %10d    / %5d        (same size) / (changed size)\n", __func__, data.n_reallocs_same, data.n_reallocs_diff);
 
         common_memory_breakdown_print(ctx);
     }

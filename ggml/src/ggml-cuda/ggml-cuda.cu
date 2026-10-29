@@ -5352,6 +5352,43 @@ static int ggml_cuda_try_fuse(ggml_backend_cuda_context * cuda_ctx, ggml_cgraph 
         }
     }
 
+    // The fork's exact MoE weighted reduce (#107) is tried first: it keeps the serial expert-add order, so outputs
+    // match the unfused graph bit for bit. Shapes it does not take fall through to upstream's reduction below.
+    // MoE router weighting + expert reduction  [kill switch: GGML_CUDA_MOE_REDUCE_DISABLE=1]
+    static bool disable_moe_reduce = getenv("GGML_CUDA_MOE_REDUCE_DISABLE") != nullptr &&
+                                     std::atoi(getenv("GGML_CUDA_MOE_REDUCE_DISABLE"));
+
+    if (!disable_moe_reduce && node->op == GGML_OP_MUL && node->ne[3] == 1 &&
+        node->ne[1] >= 2 && node->ne[1] <= GGML_CUDA_MOE_REDUCE_MAX_EXPERTS) {
+
+        const int n_exp   = (int) node->ne[1];
+        const int n_nodes = 2*n_exp;  // MUL + n_exp views + (n_exp - 1) adds
+
+        std::vector<ggml_op> ops;
+        ops.reserve(n_nodes);
+        ops.push_back(GGML_OP_MUL);
+        ops.insert(ops.end(), n_exp,     GGML_OP_VIEW);
+        ops.insert(ops.end(), n_exp - 1, GGML_OP_ADD);
+
+        const int out_node = i + n_nodes - 1;
+
+        bool stage_weights = false;
+
+        if (ggml_can_fuse_subgraph(cgraph, i, n_nodes, ops.data(), &out_node, 1) &&
+            ggml_cuda_should_fuse_moe_weighted_reduce(cgraph, i, n_exp, stage_weights)) {
+
+            static bool debug_moe_reduce = getenv("GGML_CUDA_MOE_REDUCE_DEBUG") != nullptr;
+            if (debug_moe_reduce) {
+                GGML_LOG_INFO("%s: fused moe weighted reduce: n_expert_used=%d ne0=%d n_tokens=%d staged=%d\n",
+                              __func__, n_exp, (int) node->ne[0], (int) node->ne[2], (int) stage_weights);
+            }
+
+            ggml_cuda_op_moe_weighted_reduce(*cuda_ctx, node->src[0], node->src[1], cgraph->nodes[out_node],
+                                             n_exp, stage_weights);
+            return n_nodes - 1;
+        }
+    }
+
     if (node->op == GGML_OP_MUL) {
         ggml_cuda_moe_weighted_reduction_match match;
         if (ggml_cuda_match_moe_weighted_reduction(cgraph, i, match)) {
@@ -5548,41 +5585,6 @@ static int ggml_cuda_try_fuse(ggml_backend_cuda_context * cuda_ctx, ggml_cgraph 
         if (types_ok && shape_ok && dim_ok && contig_ok && x_in_add == x) {
             ggml_cuda_op_snake_fused(*cuda_ctx, x, a, inv_b, add);
             return 4;
-        }
-    }
-
-    // MoE router weighting + expert reduction  [kill switch: GGML_CUDA_MOE_REDUCE_DISABLE=1]
-    static bool disable_moe_reduce = getenv("GGML_CUDA_MOE_REDUCE_DISABLE") != nullptr &&
-                                     std::atoi(getenv("GGML_CUDA_MOE_REDUCE_DISABLE"));
-
-    if (!disable_moe_reduce && node->op == GGML_OP_MUL && node->ne[3] == 1 &&
-        node->ne[1] >= 2 && node->ne[1] <= GGML_CUDA_MOE_REDUCE_MAX_EXPERTS) {
-
-        const int n_exp   = (int) node->ne[1];
-        const int n_nodes = 2*n_exp;  // MUL + n_exp views + (n_exp - 1) adds
-
-        std::vector<ggml_op> ops;
-        ops.reserve(n_nodes);
-        ops.push_back(GGML_OP_MUL);
-        ops.insert(ops.end(), n_exp,     GGML_OP_VIEW);
-        ops.insert(ops.end(), n_exp - 1, GGML_OP_ADD);
-
-        const int out_node = i + n_nodes - 1;
-
-        bool stage_weights = false;
-
-        if (ggml_can_fuse_subgraph(cgraph, i, n_nodes, ops.data(), &out_node, 1) &&
-            ggml_cuda_should_fuse_moe_weighted_reduce(cgraph, i, n_exp, stage_weights)) {
-
-            static bool debug_moe_reduce = getenv("GGML_CUDA_MOE_REDUCE_DEBUG") != nullptr;
-            if (debug_moe_reduce) {
-                GGML_LOG_INFO("%s: fused moe weighted reduce: n_expert_used=%d ne0=%d n_tokens=%d staged=%d\n",
-                              __func__, n_exp, (int) node->ne[0], (int) node->ne[2], (int) stage_weights);
-            }
-
-            ggml_cuda_op_moe_weighted_reduce(*cuda_ctx, node->src[0], node->src[1], cgraph->nodes[out_node],
-                                             n_exp, stage_weights);
-            return n_nodes - 1;
         }
     }
 

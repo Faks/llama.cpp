@@ -22,7 +22,7 @@ template <int ncols, bool has_fusion, bool has_gate>
 __global__ void __launch_bounds__(PQ2_0_MC_WARPS * 32, 3)
 mul_mat_vec_pq2_0_mc(const void * vx_, const void * vy_, float * dst_,
         const int ncols_x, const int nrows_x, const int stride_row_x, const int stride_col_y, const int stride_col_dst,
-        const float * x_bias, const void * vgate_, const float * gate_bias, const ggml_glu_op glu_op) {
+        const float * x_bias, const void * vgate_, const float * gate_bias, const ggml_glu_op glu_op, const float glu_limit) {
     // Plain pointer parameters, restrict-qualified locals: GGML_CUDA_RESTRICT differs between the host and device
     // passes, which breaks the template stub. Same pattern as mul_mat_vec_q.
     const void * GGML_CUDA_RESTRICT vx  = vx_;
@@ -153,6 +153,7 @@ mul_mat_vec_pq2_0_mc(const void * vx_, const void * vy_, float * dst_,
                         case GGML_GLU_OP_SWIGLU:     v *= ggml_cuda_op_silu_single(gv);          break;
                         case GGML_GLU_OP_GEGLU:      v *= ggml_cuda_op_gelu_single(gv);          break;
                         case GGML_GLU_OP_SWIGLU_OAI: v  = ggml_cuda_op_swiglu_oai_single(gv, v); break;
+                        case GGML_GLU_OP_SWIGLU_CLAMP: v = ggml_cuda_op_swiglu_clamp_single(gv, v, glu_limit); break;
                         default:                     v *= gv;                                    break;
                     }
                 }
@@ -173,13 +174,13 @@ static void mul_mat_vec_pq2_0_mc_launch(
     const ggml_cuda_kernel_launch_params lp = ggml_cuda_kernel_launch_params(block_nums, block_dims, 0, stream);
     if (fusion.gate) {
         ggml_cuda_kernel_launch(mul_mat_vec_pq2_0_mc<ncols, true, true>, lp, vx, vy, dst, ncols_x, nrows_x, stride_row_x, stride_col_y, stride_col_dst,
-            (const float *) fusion.x_bias, fusion.gate, (const float *) fusion.gate_bias, fusion.glu_op);
+            (const float *) fusion.x_bias, fusion.gate, (const float *) fusion.gate_bias, fusion.glu_op, fusion.glu_limit);
     } else if (fusion.x_bias) {
         ggml_cuda_kernel_launch(mul_mat_vec_pq2_0_mc<ncols, true, false>, lp, vx, vy, dst, ncols_x, nrows_x, stride_row_x, stride_col_y, stride_col_dst,
-            (const float *) fusion.x_bias, nullptr, nullptr, fusion.glu_op);
+            (const float *) fusion.x_bias, nullptr, nullptr, fusion.glu_op, fusion.glu_limit);
     } else {
         ggml_cuda_kernel_launch(mul_mat_vec_pq2_0_mc<ncols, false, false>, lp, vx, vy, dst, ncols_x, nrows_x, stride_row_x, stride_col_y, stride_col_dst,
-            nullptr, nullptr, nullptr, fusion.glu_op);
+            nullptr, nullptr, nullptr, fusion.glu_op, fusion.glu_limit);
     }
 }
 
